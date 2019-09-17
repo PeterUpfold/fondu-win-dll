@@ -29,7 +29,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/types.h>
-#include <unistd.h>
+//#include <unistd.h>
+#include "unistd_glue.h"
 #include <time.h>
 #include <math.h>
 
@@ -129,8 +130,10 @@ return;
 /*  special characters ("-$", etc.) are removed entirely */
 /* So Times-Bold => TimesBol, HelveticaDemiBold => HelveDemBol */
 static char *FileNameFromPSFontName(char *fontname) {
-    char *filename = strdup(fontname);
+    char *filename = _strdup(fontname);
     char *pt, *spt, *lcpt;
+
+	lcpt = NULL;
 
     for ( pt = filename, spt = fontname; *spt /*&& pt<filename+63-1*/; ++spt ) {
 	if ( isupper(*spt) || spt==fontname ) {
@@ -415,7 +418,7 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	    ch1 = getc(f);
 	    fread(name,1,ch1,f);
 	    name[ch1] = '\0';
-	    cur->fondname = strdup(name);
+	    cur->fondname = _strdup(name);
 	}
 
 	offset += 4;
@@ -512,7 +515,7 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 		    }
 		*pt = '\0';
 	    }
-	    cur->family = strdup(strings[0]);
+	    cur->family = _strdup(strings[0]);
 	    for ( j=0; j<strcnt; ++j )
 		free(strings[j]);
 	    free(strings);
@@ -652,10 +655,10 @@ return;
 	if ( cleanfilename(newname)) {
 	    if ( rename(name,newname)==-1 ) {
 		fprintf( stderr, "Could not create %s\n", newname);
-		unlink(name);
+		_unlink(name);
 	    }
 	} else
-	    unlink(name);
+	    _unlink(name);
     }
     fseek(f,here,SEEK_SET);
 }
@@ -754,10 +757,10 @@ static void ttfnameset(FILE *ttf,char *curname,char *patheticattempt) {
     if ( !ttfnamefixup(ttf,buffer))
 	strcpy(buffer,patheticattempt);
     if ( !cleanfilename(buffer))
-	unlink(curname);
+	_unlink(curname);
     else if ( rename(curname, buffer)==-1 ) {
 	fprintf( stderr, "Could not create %s\n", buffer );
-	unlink(curname);
+	_unlink(curname);
     }
 }
 
@@ -1160,7 +1163,7 @@ return( true );
 return( ret );
 }
 
-static int FindResourceFile(char *filename) {
+__declspec(dllexport) int FindResourceFile(char *filename) {
     char *spt, *pt, *dpt;
     char buffer[1400];
 

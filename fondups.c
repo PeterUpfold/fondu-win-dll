@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <unistd.h>
+#include "unistd_glue.h"
 #include "psfont.h"
 #include "macfonts.h"
 #include <locale.h>
@@ -116,7 +116,7 @@ return( true );
 static void copyenc(char *encoding[256],char *std[256]) {
     int i;
     for ( i=0; i<256; ++i )
-	encoding[i] = strdup(std[i]);
+	encoding[i] = _strdup(std[i]);
 }
 
 char *AdobeStandardEncoding[] = {
@@ -961,7 +961,7 @@ static char *getstring(char *start,FILE *in) {
 	while ( *start!='\0' && *start!='(' ) ++start;
 	if ( *start=='\0' ) {
 	    if ( myfgets(buffer,sizeof(buffer),in)==NULL )
-return( strdup(""));
+return( _strdup(""));
 	    start = buffer;
 	} else
     break;
@@ -1275,7 +1275,7 @@ static void findstring(struct fontparse *fp,struct pschars *subrs,int index,char
 	decodestr((unsigned char *) buffer,bpt-buffer);
 	bs = buffer + fp->fd->private->leniv;
 	subrs->lens[index] = bpt-bs;
-	subrs->keys[index] = strdup(nametok);
+	subrs->keys[index] = _strdup(nametok);
 	subrs->values[index] = malloc(bpt-bs);
 	memcpy(subrs->values[index],bs,bpt-bs);
 	if ( index>=subrs->next ) subrs->next = index+1;
@@ -1321,7 +1321,7 @@ return;
 	    for ( pt = buffer; !isspace(*line); *pt++ = *line++ );
 	    *pt = '\0';
 	    if ( pos>=0 && pos<256 )
-		fp->fd->encoding[pos] = strdup(buffer);
+		fp->fd->encoding[pos] = _strdup(buffer);
 	    while ( isspace(*line)) ++line;
 	    if ( strncmp(line,"put",3)==0 ) line+=3;
 	    while ( isspace(*line)) ++line;
@@ -1334,7 +1334,7 @@ return;
 	int i;
 	for ( i=0; i<256; ++i )
 	    if ( fp->fd->encoding[i]==NULL )
-		fp->fd->encoding[i] = strdup(".notdef");
+		fp->fd->encoding[i] = _strdup(".notdef");
 return;
     } else if ( fp->inencoding && strstr(line,"Encoding")!=NULL && strstr(line,"put")!=NULL ) {
 	/* Saw a type 3 font with lines like "Encoding 1 /_a0 put" */
@@ -1351,7 +1351,7 @@ return;
 		for ( pt = buffer; !isspace(*line); *pt++ = *line++ );
 		*pt = '\0';
 		if ( pos>=0 && pos<256 )
-		    fp->fd->encoding[pos] = strdup(buffer);
+		    fp->fd->encoding[pos] = _strdup(buffer);
 	    }
 	}
 return;
@@ -1725,7 +1725,7 @@ return;
 	    if ( fp->fd->fontinfo->version==NULL ) {
 		char temp[40];
 		sprintf(temp,"%f", fp->fd->cidversion);
-		fp->fd->fontinfo->version = strdup(temp);
+		fp->fd->fontinfo->version = _strdup(temp);
 	    }
 #endif
 	} else if ( mycmp("CIDFontType",line+1,endtok)==0 )
@@ -1804,7 +1804,7 @@ static void addinfo(struct fontparse *fp,char *line,char *tok,char *binstart,int
 	else {
 	    int i = chars->next;
 	    chars->lens[i] = binlen;
-	    chars->keys[i] = strdup(tok);
+	    chars->keys[i] = _strdup(tok);
 	    chars->values[i] = malloc(binlen);
 	    memcpy(chars->values[i],binstart,binlen);
 	    ++chars->next;
@@ -2111,7 +2111,7 @@ static void parsetype3(struct fontparse *fp,FILE *in) {
 }
 
 static unsigned char *readt1str(FILE *temp,int offset,int len,int leniv) {
-    int i;
+    int i = 0;
     unsigned char *str, *pt;
     unsigned short r = 4330;
     unsigned char plain, cypher;
@@ -3019,20 +3019,20 @@ return;
 	    break;
 	psfont->encoding[i] = j;
     }
-    psfont->fontname = strdup(fd->fontname);
+    psfont->fontname = _strdup(fd->fontname);
     if ( fd->fontinfo!=NULL ) {
-	psfont->familyname = strdup(fd->fontinfo->familyname);
-	psfont->fullname = strdup(fd->fontinfo->fullname);
-	psfont->weight = strdup(fd->fontinfo->weight);
-	psfont->notice = strdup(fd->fontinfo->notice);
-	psfont->version = strdup(fd->fontinfo->version);
+	psfont->familyname = _strdup(fd->fontinfo->familyname);
+	psfont->fullname = _strdup(fd->fontinfo->fullname);
+	psfont->weight = _strdup(fd->fontinfo->weight);
+	psfont->notice = _strdup(fd->fontinfo->notice);
+	psfont->version = _strdup(fd->fontinfo->version);
 	psfont->italicangle = fd->fontinfo->italicangle;
     } else {
-	psfont->familyname = strdup(fd->fontname);
+	psfont->familyname = _strdup(fd->fontname);
 	if ( (pt = strchr(psfont->familyname,'-'))!=NULL )
 	    *pt = '\0';
-	psfont->fullname = strdup(fd->fontname);
-	psfont->weight = strdup("Regular");
+	psfont->fullname = _strdup(fd->fontname);
+	psfont->weight = _strdup("Regular");
     }
     psfont->isadobestd = fd->isadobestd;
     psfont->em = 1000;
@@ -3053,7 +3053,7 @@ return;
 	    if ( psfont->glyphs[i].isref )
 		anyrefs = true;
 	    else
-		psfont->glyphs[i].glyphname = strdup(fd->chars->keys[i]);
+		psfont->glyphs[i].glyphname = _strdup(fd->chars->keys[i]);
 	}
 	++attempts;
     }
