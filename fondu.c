@@ -150,11 +150,12 @@ static int IsResourceInFile(char *filename,PSFONT *psfont);
 
 static void ProcessNestedPS( char *fontname, char *origfilename, PSFONT *psfont ) {
     char *filename = FileNameFromPSFontName(fontname);
+	char* newFilename;
 
     if ( filename!=NULL && *filename!='\0' ) {
 	char *dirend = strrchr(origfilename,'/');
 	if ( dirend!=NULL ) {
-	    char *newfn = malloc(strlen(filename)+strlen(origfilename)+1);
+	    char *newfn = (char *)malloc(strlen(filename)+strlen(origfilename)+1);
 	    strcpy(newfn,origfilename);
 	    strcpy(newfn + (dirend-origfilename)+1, filename);
 	    free(filename);
@@ -164,7 +165,10 @@ static void ProcessNestedPS( char *fontname, char *origfilename, PSFONT *psfont 
 	    IsResourceInFile(filename,psfont);
 	else {
 	    char *end;
-	    filename = realloc(filename,strlen(filename)+10);
+	    newFilename = (char *)realloc(filename,strlen(filename)+10);
+		if (newFilename != NULL) {
+			filename = newFilename;
+		}
 	    end = filename+strlen(filename);
 	    strcpy(end,".bin");
 	    if ( access(filename,R_OK)==0 )
@@ -409,7 +413,7 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	/* mbz = */ getlong(f);
 	here = ftell(f);
 
-	cur = calloc(1,sizeof(FOND));
+	cur = (FOND *)calloc(1,sizeof(FOND));
 	cur->next = head;
 	head = cur;
 
@@ -440,7 +444,7 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	/* internal & undefined, for international scripts = */ getlong(f);
 	/* version = */ getushort(f);
 	cur->assoc_cnt = getushort(f)+1;
-	cur->assoc = calloc(cur->assoc_cnt,sizeof(struct assoc));
+	cur->assoc = (struct assoc *)calloc(cur->assoc_cnt,sizeof(struct assoc));
 	for ( j=0; j<cur->assoc_cnt; ++j ) {
 	    cur->assoc[j].size = getushort(f);
 	    cur->assoc[j].style = getushort(f);
@@ -450,10 +454,10 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	    fseek(f,widoff,SEEK_SET);
 	    cnt = getushort(f)+1;
 	    cur->stylewidthcnt = cnt;
-	    cur->stylewidths = calloc(cnt,sizeof(struct stylewidths));
+	    cur->stylewidths = (struct stylewidths *)calloc(cnt,sizeof(struct stylewidths));
 	    for ( j=0; j<cnt; ++j ) {
 		cur->stylewidths[j].style = getushort(f);
-		cur->stylewidths[j].widthtab = malloc((cur->last-cur->first+3)*sizeof(short));
+		cur->stylewidths[j].widthtab = (short *)malloc((cur->last-cur->first+3)*sizeof(short));
 		for ( k=cur->first; k<=cur->last+2; ++k )
 		    cur->stylewidths[j].widthtab[k] = getushort(f);
 	    }
@@ -462,11 +466,11 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	    fseek(f,kernoff,SEEK_SET);
 	    cnt = getushort(f)+1;
 	    cur->stylekerncnt = cnt;
-	    cur->stylekerns = calloc(cnt,sizeof(struct stylekerns));
+	    cur->stylekerns = (struct stylekerns *)calloc(cnt,sizeof(struct stylekerns));
 	    for ( j=0; j<cnt; ++j ) {
 		cur->stylekerns[j].style = getushort(f);
 		cur->stylekerns[j].kernpairs = getushort(f);
-		cur->stylekerns[j].kerns = malloc(cur->stylekerns[j].kernpairs*sizeof(struct kerns));
+		cur->stylekerns[j].kerns = (struct kerns *)malloc(cur->stylekerns[j].kernpairs*sizeof(struct kerns));
 		for ( k=0; k<cur->stylekerns[j].kernpairs; ++k ) {
 		    cur->stylekerns[j].kerns[k].ch1 = getc(f);
 		    cur->stylekerns[j].kerns[k].ch2 = getc(f);
@@ -485,10 +489,10 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	    for ( j=0; j<48; ++j )
 		stringoffsets[j] = getc(f);
 	    strcnt = getushort(f);
-	    strings = malloc(strcnt*sizeof(char *));
+	    strings = (char **)malloc(strcnt*sizeof(char *));
 	    for ( j=0; j<strcnt; ++j ) {
 		strlen = getc(f);
-		strings[j] = malloc(strlen+2);
+		strings[j] = (char *)malloc(strlen+2);
 		strings[j][0] = strlen;
 		strings[j][strlen+1] = '\0';
 		for ( k=0; k<strlen; ++k )
@@ -505,7 +509,7 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 		if ( format!=0 && format!=-1 )
 		    for ( k=0; k<strings[format][0]; ++k )
 			strlen += strings[ strings[format][k+1]-1 ][0];
-		pt = cur->psnames[j] = malloc(strlen+1);
+		pt = cur->psnames[j] = (char *)malloc(strlen+1);
 		strcpy(pt,strings[ 0 ]+1);
 		pt += strings[ 0 ][0];
 		if ( format!=0 && format!=-1 )
@@ -546,7 +550,7 @@ static void SearchPostscriptResources(FILE *f,long rlistpos,int subcnt,long rdat
     FILE *pfb;
 
     fseek(f,rlistpos,SEEK_SET);
-    offsets = calloc(subcnt,sizeof(long));
+    offsets = (long *)calloc(subcnt,sizeof(long));
     for ( i=0; i<subcnt; ++i ) {
 	/* resource id = */ getushort(f);
 	tmp = (short) getushort(f);
@@ -613,7 +617,7 @@ return;
 	    free(buffer);
 	    max = rlen;
 	    if ( max<0x800 ) max = 0x800;
-	    buffer=malloc(max);
+	    buffer=(char *)malloc(max);
 	    if ( buffer==NULL ) {
 		fprintf( stderr, "Out of memory\n" );
 		exit( 1 );
@@ -811,7 +815,7 @@ static void SearchTtfResources(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	    free(buffer);
 	    max = ilen;
 	    if ( max<0x800 ) max = 0x800;
-	    buffer=malloc(max);
+	    buffer=(char *)malloc(max);
 	}
 	for ( len=0; len<rlen; ) {
 	    int temp = ilen;
@@ -832,7 +836,7 @@ static void SearchTtfResources(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 /* Look for a bare truetype font in a binhex/macbinary wrapper */
 static int MightBeTrueType(FILE *binary,int pos,int dlen,char *filename) {
     FILE *out = fopen(filename,"w");
-    char *buffer = malloc(8192);
+    char *buffer = (char *)malloc(8192);
     int len;
 
     if ( out==NULL ) {
@@ -943,7 +947,7 @@ return( true );
 #ifndef OldMacintosh
 	/* OS/X and linux with appropriate drivers */
 static int HasResourceFork(char *filename,PSFONT *psfont) {
-    char *respath = malloc(strlen(filename)+strlen("/rsrc")+1);
+    char *respath = (char *)malloc(strlen(filename)+strlen("/rsrc")+1);
     FILE *temp;
     int ret=false;
 
@@ -1049,8 +1053,11 @@ static void outchr(FILE *binary, int ch) {
 static int IsResourceInHex(FILE *f,char *filename, PSFONT *psfont) {
     /* convert file from 6bit to 8bit */
     /* interesting data is enclosed between two colons */
+	char sixbit_const[] = "!\"#$%&'()*+,-012345689@ABCDEFGHIJKLMNPQRSTUVXYZ[`abcdefhijklmpqr";
     FILE *binary = tmpfile();
-    char *sixbit = "!\"#$%&'()*+,-012345689@ABCDEFGHIJKLMNPQRSTUVXYZ[`abcdefhijklmpqr";
+	
+	char* sixbit = (char *)malloc(sizeof(sixbit_const));
+	strncpy(sixbit, sixbit_const, sizeof(sixbit_const));
     int ch, val, cnt, i, dlen, rlen, ret;
     char header[20], *pt;
     char wrappedfilename[128];
@@ -1202,7 +1209,12 @@ return( true );
 return( IsResourceInFile(buffer,NULL));
 }
 
-int main(int argc, char **argv) {
+__declspec(dllexport) int fondu_simple_main(char* filename)
+{
+	return FindResourceFile(filename);
+}
+
+int old_main(int argc, char **argv) {
     int i, ret = 0;
 
     for ( i=1; i<argc; ++i )

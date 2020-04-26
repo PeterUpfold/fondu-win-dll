@@ -34,34 +34,51 @@
 enum style_flags { sf_bold = 1, sf_italic = 2, sf_underline = 4, sf_outline = 8,
 	sf_shadow = 0x10, sf_condense = 0x20, sf_extend = 0x40 };
 
+
+struct kerns {
+    unsigned char ch1, ch2;
+    short offset;		/* 4.12 */
+};
+
+struct assoc {
+    short size, style, id;
+};
+
+struct stylewidths {
+    short style;
+    short* widthtab;		/* 4.12 fixed number with the width specified as a fraction of an em */
+};
+
+struct stylekerns {
+    short style;
+    int kernpairs;
+    struct kerns* kerns;
+};
+
 typedef struct fond {
     char *fondname;
     int first, last;
     int assoc_cnt;
-    struct assoc {
-	short size, style, id;
-    } *assoc;
+    struct assoc *assoc;
 	/* size==0 => scalable */
 	/* style>>8 is the bit depth (0=>1, 1=>2, 2=>4, 3=>8) */
 	/* search order for ID is sfnt, NFNT, FONT */
     int stylewidthcnt;
-    struct stylewidths {
-	short style;
-	short *widthtab;		/* 4.12 fixed number with the width specified as a fraction of an em */
-    } *stylewidths;
+    struct stylewidths *stylewidths;
     int stylekerncnt;
-    struct stylekerns {
-	short style;
-	int kernpairs;
-	struct kerns {
-	    unsigned char ch1, ch2;
-	    short offset;		/* 4.12 */
-	} *kerns;
-    } *stylekerns;
+    struct stylekerns *stylekerns;
     char *psnames[48];
     char *family;
     struct fond *next;
 } FOND;
+
+struct bbglyph {
+    char* glyphname;
+    int top, bottom, left, right;
+    int hadvance;
+    int isref;
+};
+
 
 typedef struct PSFONT {
     char *fontname, *familyname, *weight, *fullname, *notice, *version;
@@ -71,15 +88,12 @@ typedef struct PSFONT {
     int as, ds, ch, xh;
     int isadobestd;
     int glyphcnt;
-    struct bbglyph {
-	char *glyphname;
-	int top, bottom, left, right;
-	int hadvance;
-	int isref;
-    } *glyphs;
+    struct bbglyph *glyphs;
     short encoding[256];		/* glyph ids */
     void *temp;
 } PSFONT;
+
+
 
 extern int tolatin1;
 extern const char *macnames[];
