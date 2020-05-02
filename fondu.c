@@ -759,12 +759,16 @@ static void ttfnameset(FILE *ttf,char *curname,char *patheticattempt) {
     char buffer[1024];
 
     if ( !ttfnamefixup(ttf,buffer))
-	strcpy(buffer,patheticattempt);
+	strncpy(buffer,patheticattempt, 1024);
     if ( !cleanfilename(buffer))
-	_unlink(curname);
-    else if ( rename(curname, buffer)==-1 ) {
-	fprintf( stderr, "Could not create %s\n", buffer );
-	_unlink(curname);
+	_unlink(curname);	
+    else {
+		fclose(ttf);
+		int rename_result = rename(curname, buffer);
+		if (rename_result == -1) {
+			fprintf(stderr, "Could not create %s\n", buffer);
+			_unlink(curname);
+		}
     }
 }
 
@@ -1146,7 +1150,8 @@ static int IsResourceInFile(char *filename,PSFONT *psfont) {
     f = fopen(filename,"r");
     if ( f==NULL )
 return( false );
-    spt = strrchr(filename,'/');
+    //spt = strrchr(filename,'/');
+	spt = strrchr(filename, '\\'); // Windows dir-sep fixup -- we are reliant on
     if ( spt==NULL ) spt = filename;
     pt = strrchr(spt,'.');
     if ( pt!=NULL && (pt[1]=='b' || pt[1]=='B') && (pt[2]=='i' || pt[2]=='I') &&

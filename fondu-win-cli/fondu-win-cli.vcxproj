@@ -94,6 +94,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -147,7 +148,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="fondu-win-cli.cpp" />
+    <ClCompile Include="fondu-win-cli.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\fondu-win-dll.vcxproj">
+      <Project>{f7bc469c-970c-45b2-9e1d-550af2421bfe}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

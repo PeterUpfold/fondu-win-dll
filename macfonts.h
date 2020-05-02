@@ -1,3 +1,4 @@
+#pragma once
 /* Copyright (C) 2001-2003 by George Williams */
 /*
  * Redistribution and use in source and binary forms, with or without

@@ -44,13 +44,13 @@
     <ClCompile Include="fondu.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="unistd_glue.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="readnfnt.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="fondups.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="unistd_glue.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
