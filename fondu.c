@@ -658,7 +658,7 @@ return;
     if ( psfont==NULL ) {
 	if ( cleanfilename(newname)) {
 	    if ( rename(name,newname)==-1 ) {
-		fprintf( stderr, "Could not create %s\n", newname);
+		fprintf( stderr, "Could not create %s -- SearchPostscrptResources\n", newname);
 		_unlink(name);
 	    }
 	} else
@@ -764,11 +764,17 @@ static void ttfnameset(FILE *ttf,char *curname,char *patheticattempt) {
 	_unlink(curname);	
     else {
 		fclose(ttf);
+
+		// force unlink
+		_unlink(buffer);
+
 		int rename_result = rename(curname, buffer);
 		if (rename_result == -1) {
-			fprintf(stderr, "Could not create %s\n", buffer);
+			fprintf(stderr, "Could not create %s -- ttfnameset\n", buffer);
 			_unlink(curname);
 		}
+
+		ttf = fopen(buffer, "rb");
     }
 }
 
@@ -785,23 +791,42 @@ static void SearchTtfResources(FILE *f,long rlistpos,int subcnt,long rdata_pos,
     char *buffer=NULL;
     int max = 0;
     FILE *ttf;
-
+	//rlistpos = 635953, on Unix = 635980
     fseek(f,rlistpos,SEEK_SET);
     for ( i=0; i<subcnt; ++i ) {
 	/* resource id = */ getushort(f);
 	rname = (short) getushort(f);
 	/* flags = */ getc(f);
 	ch1 = getc(f); ch2 = getc(f);
+
+	if (ch1 == EOF || ch2 == EOF) {
+		fprintf(stderr, "Unable to get character from file to determine TTF name");
+		exit(EXIT_FAILURE);
+	}
+
+
 	roff = rdata_pos+((ch1<<16)|(ch2<<8)|getc(f));
 	/* mbz = */ getlong(f);
 	here = ftell(f);
 	if ( rname!=-1 ) {
-	    fseek(f,name_list+rname,SEEK_SET);
+	    int fseek_return = fseek(f,name_list+rname,SEEK_SET);
+		fprintf(stderr, "fseek: %d", fseek_return);
 	    ch1 = getc(f);
-	    fread(newname,1,ch1,f);
+
+		fprintf(stderr, "ferror: %d", ferror(f));
+		fprintf(stderr, "feof: %d", feof(f));
+
+	    size_t read_items = fread(newname,1,ch1,f);
+		fprintf(stderr, "Read: %d", read_items);
+
+		if (ch1 == EOF || ch2 == EOF) {
+			fprintf(stderr, "Unable to get character from file to determine TTF name");
+			exit(EXIT_FAILURE);
+		}
+
 	    strcpy(newname+ch1,".ttf");
 	} else
-	    sprintf(newname,"Untitled-%d.ttf", ++ucnt );
+	    snprintf(newname, sizeof(newname), "Untitled-%d.ttf", ++ucnt );
 
 	mytmpname(name);
 	ttf = fopen( name,"w+" );
@@ -825,8 +850,15 @@ static void SearchTtfResources(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	    int temp = ilen;
 	    if ( rlen-len<ilen ) temp = rlen-len;
 	    temp = fread(buffer,1,temp,f);
+		
 	    if ( temp==EOF )
 	break;
+
+		if (ferror(f)) {
+			fprintf(stderr, "ferror: %d\n", ferror(f));
+			break;
+		}
+
 	    fwrite(buffer,1,temp,ttf);
 	    len += temp;
 	}
@@ -957,7 +989,7 @@ static int HasResourceFork(char *filename,PSFONT *psfont) {
 
     strcpy(respath,filename);
     strcat(respath,"/rsrc");
-    temp = fopen(respath,"r");
+    temp = fopen(respath,"rb");
     free(respath);
     if ( temp!=NULL ) {
 	ret = IsResourceFork(temp,0,filename,psfont);
@@ -1147,7 +1179,7 @@ static int IsResourceInFile(char *filename,PSFONT *psfont) {
     char *spt, *pt;
     int ret;
 
-    f = fopen(filename,"r");
+    f = fopen(filename,"rb");
     if ( f==NULL )
 return( false );
     //spt = strrchr(filename,'/');
@@ -1216,6 +1248,7 @@ return( IsResourceInFile(buffer,NULL));
 
 __declspec(dllexport) int fondu_simple_main(char* filename)
 {
+	force = true;
 	return FindResourceFile(filename);
 }
 
