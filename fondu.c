@@ -39,19 +39,46 @@
 int tolatin1 = false;
 static int force = false, inquire = false, doafm = false, trackps = false, show=false;
 
+void debugFtell(FILE* f) {
+	char buffer[512];
+	memset(&buffer, 0, 512);
+	snprintf(&buffer, 512, "file position: %ld\n", ftell(f));
+	if (ftell(f) == 0) {
+		OutputDebugStringA("Check me");
+	}
+	OutputDebugStringA(&buffer);
+
+	snprintf(&buffer, 512, "error: %d\n", ferror(f));
+	OutputDebugStringA(&buffer);
+	snprintf(&buffer, 512, "feof: %d\n", feof(f));
+	OutputDebugStringA(&buffer);
+}
+
 int getushort(FILE *f) {
+#if _DEBUG && _WINDOWS
+	debugFtell(f);
+#endif
     int ch1 = getc(f);
     int ch2 = getc(f);
+#if _DEBUG && _WINDOWS
+	debugFtell(f);
+#endif
     if ( ch2==EOF )
 return( EOF );
 return( (ch1<<8)|ch2 );
 }
 
 long getlong(FILE *f) {
+#if _DEBUG && _WINDOWS
+	debugFtell(f);
+#endif
     int ch1 = getc(f);
     int ch2 = getc(f);
     int ch3 = getc(f);
     int ch4 = getc(f);
+#if _DEBUG && _WINDOWS
+	debugFtell(f);
+#endif
     if ( ch4==EOF )
 return( EOF );
 return( (ch1<<24)|(ch2<<16)|(ch3<<8)|ch4 );
@@ -220,7 +247,7 @@ static FILE *CreateAfmFile(FILE *f,FOND *fond,int style,
     strcat(namebuf,".afm");
     if ( !cleanfilename(namebuf))
 return( NULL );
-    afm = fopen( namebuf,"w" );
+    afm = fopen( namebuf,"wb" );
     if ( afm==NULL )
 	fprintf( stderr, "Can't open %s\n", namebuf );
 return( afm );
@@ -570,7 +597,7 @@ static void SearchPostscriptResources(FILE *f,long rlistpos,int subcnt,long rdat
     } else
 	sprintf(newname,"Untitled-%d.pfb", ++ucnt );
 
-    pfb = psfont!=NULL ? tmpfile() : fopen( name,"w" );
+    pfb = psfont!=NULL ? tmpfile() : fopen( name,"wb" );
     if ( pfb==NULL ) {
 	fprintf( stderr, "Can't open temporary file for postscript output\n" );
 	fseek(f,here,SEEK_SET );
@@ -674,7 +701,11 @@ static int ttfnamefixup(FILE *ttf,char *buffer) {
     int plat, spec, lang, name, len, off, ch;
     char *pt;
 
+	debugFtell(ttf);
     rewind(ttf);
+	debugFtell(ttf);
+	fseek(ttf, 0L, SEEK_SET);
+	debugFtell(ttf);
     if ( (version=getlong(ttf))==CHR('O','T','T','O'))
 	isotf = true;
     else if ( version!=0x10000 && version!=CHR('t','r','u','e'))
@@ -829,7 +860,7 @@ static void SearchTtfResources(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	    snprintf(newname, sizeof(newname), "Untitled-%d.ttf", ++ucnt );
 
 	mytmpname(name);
-	ttf = fopen( name,"w+" );
+	ttf = fopen( name,"w+b" );
 	if ( ttf==NULL ) {
 	    fprintf( stderr, "Can't open temporary file for truetype output.\n" );
 	    fseek(f,here,SEEK_SET );
@@ -871,7 +902,7 @@ static void SearchTtfResources(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 
 /* Look for a bare truetype font in a binhex/macbinary wrapper */
 static int MightBeTrueType(FILE *binary,int pos,int dlen,char *filename) {
-    FILE *out = fopen(filename,"w");
+    FILE *out = fopen(filename,"wb");
     char *buffer = (char *)malloc(8192);
     int len;
 
@@ -908,7 +939,11 @@ static int IsResourceFork(FILE *f, long offset,char *filename, PSFONT *psfont) {
     FOND *fondlist=NULL, *fl;
 
     fseek(f,offset,SEEK_SET);
-    if ( fread(buffer,1,16,f)!=16 )
+	debugFtell(f);
+	size_t bytes_read = fread(buffer, 1, 16, f);
+	debugFtell(f);
+	
+    if (bytes_read!=16 )
 return( false );
     rdata_pos = offset + ((buffer[0]<<24)|(buffer[1]<<16)|(buffer[2]<<8)|buffer[3]);
     map_pos = offset + ((buffer[4]<<24)|(buffer[5]<<16)|(buffer[6]<<8)|buffer[7]);
