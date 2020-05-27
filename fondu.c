@@ -36,9 +36,17 @@
 
 #include "macfonts.h"
 
+#include <crtdbg.h>
+#include <assert.h>
+
+#define FIND_RESOURCE_FILE_BUFFER_LENGTH 1400
+#define BUILD_FOND_LIST_NAME_LENGTH 300
+#define SEARCH_TTF_RESOURCES_NAME_LENGTH 300
+
 int tolatin1 = false;
 static int force = false, inquire = false, doafm = false, trackps = false, show=false;
 
+#if DEBUG
 void debugFtell(FILE* f) {
 	char buffer[512];
 	memset(&buffer, 0, 512);
@@ -53,6 +61,7 @@ void debugFtell(FILE* f) {
 	snprintf(&buffer, 512, "feof: %d\n", feof(f));
 	OutputDebugStringA(&buffer);
 }
+#endif
 
 int getushort(FILE *f) {
 #if _DEBUG && _WINDOWS
@@ -141,7 +150,7 @@ static void mytmpname(char *temp) {
     /* build up a temporary filename that doesn't match anything else */
 
     forever {
-	sprintf( temp, "fondu%04X-%d", getpid(), ++upos );
+	snprintf( temp, SEARCH_TTF_RESOURCES_NAME_LENGTH, "fondu%04X-%d", getpid(), ++upos );
 	if ( access(temp,F_OK)==-1 )
 return;
     }
@@ -182,9 +191,11 @@ static void ProcessNestedPS( char *fontname, char *origfilename, PSFONT *psfont 
     if ( filename!=NULL && *filename!='\0' ) {
 	char *dirend = strrchr(origfilename,'/');
 	if ( dirend!=NULL ) {
-	    char *newfn = (char *)malloc(strlen(filename)+strlen(origfilename)+1);
-	    strcpy(newfn,origfilename);
-	    strcpy(newfn + (dirend-origfilename)+1, filename);
+		size_t newfn_size = strlen(filename) + strlen(origfilename) + 1;
+	    char *newfn = (char *)malloc(newfn_size);
+	    strcpy_s(newfn, newfn_size, origfilename);
+		size_t replaced_size = dirend - origfilename + 1;
+		strncpy(newfn + (dirend - origfilename) + 1, filename, (newfn_size - (dirend - newfn)));
 	    free(filename);
 	    filename = newfn;
 	}
@@ -193,15 +204,14 @@ static void ProcessNestedPS( char *fontname, char *origfilename, PSFONT *psfont 
 	else {
 	    char *end;
 	    newFilename = (char *)realloc(filename,strlen(filename)+10);
-		if (newFilename != NULL) {
-			filename = newFilename;
-		}
+		assert(newFilename != NULL);
+		filename = newFilename;
 	    end = filename+strlen(filename);
-	    strcpy(end,".bin");
+	    strncpy(end,".bin", strlen(".bin"));
 	    if ( access(filename,R_OK)==0 )
 		IsResourceInFile(filename,psfont);
 	    else {
-		strcpy(end,".hqx");
+		strncpy(end,".hqx", strlen(".hqx"));
 		if ( access(filename,R_OK)==0 )
 		    IsResourceInFile(filename,psfont);
 	    }
@@ -424,7 +434,7 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
     long here, start = ftell(f);
     long offset;
     int rname = -1;
-    char name[300];
+    char name[BUILD_FOND_LIST_NAME_LENGTH];
     int ch1, ch2;
     int i, j, k, cnt, isfixed;
     FOND *head=NULL, *cur;
@@ -447,6 +457,8 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	if ( rname!=-1 ) {
 	    fseek(f,name_list+rname,SEEK_SET);
 	    ch1 = getc(f);
+		// cannot be  > BUILD_FONT_LIST_NAME_LENGTH
+		assert(ch1 <= BUILD_FOND_LIST_NAME_LENGTH);
 	    fread(name,1,ch1,f);
 	    name[ch1] = '\0';
 	    cur->fondname = _strdup(name);
@@ -517,9 +529,11 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 		stringoffsets[j] = getc(f);
 	    strcnt = getushort(f);
 	    strings = (char **)malloc(strcnt*sizeof(char *));
+		assert(strings != NULL);
 	    for ( j=0; j<strcnt; ++j ) {
 		strlen = getc(f);
 		strings[j] = (char *)malloc(strlen+2);
+		assert(strings[j] != NULL);
 		strings[j][0] = strlen;
 		strings[j][strlen+1] = '\0';
 		for ( k=0; k<strlen; ++k )
@@ -537,11 +551,12 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 		    for ( k=0; k<strings[format][0]; ++k )
 			strlen += strings[ strings[format][k+1]-1 ][0];
 		pt = cur->psnames[j] = (char *)malloc(strlen+1);
-		strcpy(pt,strings[ 0 ]+1);
+		assert(pt != NULL);
+		strcpy_s(pt, strlen+1, strings[ 0 ]+1);
 		pt += strings[ 0 ][0];
 		if ( format!=0 && format!=-1 )
 		    for ( k=0; k<strings[format][0]; ++k ) {
-			strcpy(pt,strings[ strings[format][k+1]-1 ]+1);
+			strcpy_s(pt, strlen+1, strings[ strings[format][k+1]-1 ]+1);
 			pt += strings[ strings[format][k+1]-1 ][0];
 		    }
 		*pt = '\0';
@@ -694,18 +709,15 @@ return;
     fseek(f,here,SEEK_SET);
 }
 
-static int ttfnamefixup(FILE *ttf,char *buffer) {
+static int ttfnamefixup(FILE *ttf,char *buffer, size_t buffer_size) {
     int version, isotf=false;
     int i,num, nameoffset, stringoffset;
     int fullval, famval, fullstr, famstr, fulllen, famlen, val, tag;
     int plat, spec, lang, name, len, off, ch;
     char *pt;
 
-	debugFtell(ttf);
     rewind(ttf);
-	debugFtell(ttf);
 	fseek(ttf, 0L, SEEK_SET);
-	debugFtell(ttf);
     if ( (version=getlong(ttf))==CHR('O','T','T','O'))
 	isotf = true;
     else if ( version!=0x10000 && version!=CHR('t','r','u','e'))
@@ -766,31 +778,38 @@ return( false );
 
     fseek(ttf,stringoffset+fullstr,SEEK_SET);
     pt = buffer;
+	int relative_offset = 0;
     if ( val==3 ) {
 	for ( i=0; i<len; ++i ) {
 	    ch = getc(ttf);
 	    /* avoid characters that are hard to manipulate on the command line */
-	    if ( ch>'!' && ch!='*' && ch!='?' && ch!='/' && ch!='\\' && ch<0x7f )
+	    if ( ch>'!' && ch!='*' && ch!='?' && ch!='/' && ch!='\\' && ch<0x7f ) {
 		*pt++ = ch;
+		relative_offset += sizeof(char);
+		assert(relative_offset <= buffer_size-5);
+		}
 	}
     } else {
 	for ( i=0; i<len/2; ++i ) {
 	    /* Ignore high unicode byte */ getc(ttf)/*<<8*/;
 	    ch = getc(ttf);
 	    /* avoid characters that are hard to manipulate on the command line */
-	    if ( ch>'!' && ch!='*' && ch!='?' && ch!='/' && ch!='\\' && ch<0x7f )
+	    if ( ch>'!' && ch!='*' && ch!='?' && ch!='/' && ch!='\\' && ch<0x7f ) {
 		*pt++ = ch;
+		relative_offset += sizeof(char);
+		assert(relative_offset <= buffer_size-5);
+		}
 	}
     }
-    strcpy(pt,isotf?".otf":".ttf");
+    strncpy(pt,isotf?".otf":".ttf", strlen(".otf"));
 return( true );
 }
 
 static void ttfnameset(FILE *ttf,char *curname,char *patheticattempt) {
     char buffer[1024];
 
-    if ( !ttfnamefixup(ttf,buffer))
-	strncpy(buffer,patheticattempt, 1024);
+    if ( !ttfnamefixup(ttf,buffer, 1024))
+	strcpy_s(buffer, 1024, patheticattempt);
     if ( !cleanfilename(buffer))
 	_unlink(curname);	
     else {
@@ -814,7 +833,7 @@ static void SearchTtfResources(FILE *f,long rlistpos,int subcnt,long rdata_pos,
     long here, start = ftell(f);
     long roff;
     int rname = -1;
-    char name[300], newname[300];
+    char name[SEARCH_TTF_RESOURCES_NAME_LENGTH], newname[SEARCH_TTF_RESOURCES_NAME_LENGTH];
     int ch1, ch2;
     static int ucnt;
     int len, i, rlen, ilen;
@@ -841,21 +860,22 @@ static void SearchTtfResources(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	here = ftell(f);
 	if ( rname!=-1 ) {
 	    int fseek_return = fseek(f,name_list+rname,SEEK_SET);
-		fprintf(stderr, "fseek: %d", fseek_return);
+		//fprintf(stderr, "fseek: %d", fseek_return);
 	    ch1 = getc(f);
 
-		fprintf(stderr, "ferror: %d", ferror(f));
-		fprintf(stderr, "feof: %d", feof(f));
+		//fprintf(stderr, "ferror: %d", ferror(f));
+		//fprintf(stderr, "feof: %d", feof(f));
 
+		assert(ch1 < SEARCH_TTF_RESOURCES_NAME_LENGTH - 5); // minus 5 to fit ".ttf\0"
 	    size_t read_items = fread(newname,1,ch1,f);
-		fprintf(stderr, "Read: %d", read_items);
+		//fprintf(stderr, "Read: %d", read_items);
 
 		if (ch1 == EOF || ch2 == EOF) {
 			fprintf(stderr, "Unable to get character from file to determine TTF name");
 			exit(EXIT_FAILURE);
 		}
 
-	    strcpy(newname+ch1,".ttf");
+	    strncpy(newname+ch1,".ttf", strlen(".ttf"));
 	} else
 	    snprintf(newname, sizeof(newname), "Untitled-%d.ttf", ++ucnt );
 
@@ -939,9 +959,13 @@ static int IsResourceFork(FILE *f, long offset,char *filename, PSFONT *psfont) {
     FOND *fondlist=NULL, *fl;
 
     fseek(f,offset,SEEK_SET);
+#if _DEBUG && _WINDOWS
 	debugFtell(f);
+#endif
 	size_t bytes_read = fread(buffer, 1, 16, f);
+#if _DEBUG && _WINDOWS
 	debugFtell(f);
+#endif
 	
     if (bytes_read!=16 )
 return( false );
@@ -1214,13 +1238,22 @@ static int IsResourceInFile(char *filename,PSFONT *psfont) {
     char *spt, *pt;
     int ret;
 
+	size_t filename_length = strlen(filename);
+
     f = fopen(filename,"rb");
     if ( f==NULL )
 return( false );
     //spt = strrchr(filename,'/');
 	spt = strrchr(filename, '\\'); // Windows dir-sep fixup -- we are reliant on
     if ( spt==NULL ) spt = filename;
+
+	size_t spt_length = strlen(spt);
     pt = strrchr(spt,'.');
+
+	// determine relative dot position = pt - spt
+	// if spt_length is less than relative dot position + 3, we will step out of bounds
+	assert(spt_length > (pt - spt) + 4);
+
     if ( pt!=NULL && (pt[1]=='b' || pt[1]=='B') && (pt[2]=='i' || pt[2]=='I') &&
 	    (pt[3]=='n' || pt[3]=='N') && pt[4]=='\0' ) {
 	if ( IsResourceInBinary(f,filename,psfont)) {
@@ -1244,18 +1277,22 @@ return( ret );
 
 __declspec(dllexport) int FindResourceFile(char *filename) {
     char *spt, *pt, *dpt;
-    char buffer[1400];
+    char buffer[FIND_RESOURCE_FILE_BUFFER_LENGTH];
 
     if ( IsResourceInFile(filename,NULL))
 return( true );
 
     /* Well, look in the resource fork directory (if it exists), the resource */
     /*  fork is placed there in a seperate file on non-Mac disks */
-    strcpy(buffer,filename);
+    strcpy_s(buffer, FIND_RESOURCE_FILE_BUFFER_LENGTH, filename);
     spt = strrchr(buffer,'/');
     if ( spt==NULL ) { spt = buffer; pt = filename; }
     else { ++spt; pt = filename + (spt-buffer); }
-    strcpy(spt,"resource.frk/");
+
+	// spt-buffer is relative position of last slash
+	// therefore FIND_RESOURCE_FILE_BUFFER_LENGTH - (spt-buffer) - 1 is remaining space in buffer
+    strncpy(spt,"resource.frk/", (FIND_RESOURCE_FILE_BUFFER_LENGTH - (spt-buffer) -1));
+
     strcat(spt,pt);
     if ( IsResourceInFile(buffer,NULL))
 return( true );
