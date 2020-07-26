@@ -49,10 +49,20 @@
 #define SEARCH_TTF_RESOURCES_NAME_LENGTH 300
 
 
-#if _DEBUG
-#define fopen(_FileName, _Mode) fopen(_FileName, _Mode); OutputDebugStringA("fopen called\n");
-#define fclose(_Stream) fclose(_Stream); OutputDebugStringA("fclose called\n");
+#if _DEBUG && _WINDOWS
+//#define fopen(_FileName, _Mode) fopen(_FileName, _Mode); char fopb[512]; snprintf(&fopb, 512, "fopen called: %s", _FileName); OutputDebugStringA(fopb);
+//#define fclose(_Stream) fclose(_Stream); OutputDebugStringA("fclose called\n");
+//FILE* debug_fopen(const char* _FileName, const char* _Mode) {
+//	FILE* stream;
+//
+//	errno_t result = fopen_s(&stream, _FileName, _Mode);
+//
+//	return stream;
+//}
+//FILE* debug_fclose(FILE* _Stream) {
+//}
 #endif
+
 
 
 int tolatin1 = false;
@@ -60,18 +70,18 @@ static int force = false, inquire = false, doafm = false, trackps = false, show=
 
 #if _DEBUG
 void debugFtell(FILE* f) {
-	char buffer[512];
-	memset(&buffer, 0, 512);
-	snprintf(&buffer, 512, "file position: %ld\n", ftell(f));
-	if (ftell(f) == 0) {
-		OutputDebugStringA("Check me\n");
-	}
-	OutputDebugStringA(&buffer);
+	//char buffer[512];
+	//memset(&buffer, 0, 512);
+	//snprintf(&buffer, 512, "file position: %ld\n", ftell(f));
+	//if (ftell(f) == 0) {
+	//	OutputDebugStringA("Check me\n");
+	//}
+	//OutputDebugStringA(&buffer);
 
-	snprintf(&buffer, 512, "error: %d\n", ferror(f));
-	OutputDebugStringA(&buffer);
-	snprintf(&buffer, 512, "feof: %d\n", feof(f));
-	OutputDebugStringA(&buffer);
+	//snprintf(&buffer, 512, "error: %d\n", ferror(f));
+	//OutputDebugStringA(&buffer);
+	//snprintf(&buffer, 512, "feof: %d\n", feof(f));
+	//OutputDebugStringA(&buffer);
 	//fopen(const char * _FileName, const char *_Mode)
 }
 #endif
@@ -1342,7 +1352,15 @@ return( IsResourceInFile(buffer,NULL));
 __declspec(dllexport) int fondu_simple_main(char* filename)
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_CHECK_ALWAYS_DF | _CRTDBG_LEAK_CHECK_DF);
-	force = true;	return FindResourceFile(filename);
+	force = true;
+	int result = FindResourceFile(filename);
+
+#if _WINDOWS
+	// hack to get around some inconsistency with fopen/fclose calls
+	_fcloseall();
+#endif
+
+	return result;
 }
 
 int old_main(int argc, char **argv) {
