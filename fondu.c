@@ -36,6 +36,11 @@
 
 #include "macfonts.h"
 
+#if _DEBUG
+#include <windows.h>
+#include <debugapi.h>
+#endif
+
 #include <crtdbg.h>
 #include <assert.h>
 
@@ -43,16 +48,23 @@
 #define BUILD_FOND_LIST_NAME_LENGTH 300
 #define SEARCH_TTF_RESOURCES_NAME_LENGTH 300
 
+
+#if _DEBUG
+#define fopen(_FileName, _Mode) fopen(_FileName, _Mode); OutputDebugStringA("fopen called\n");
+#define fclose(_Stream) fclose(_Stream); OutputDebugStringA("fclose called\n");
+#endif
+
+
 int tolatin1 = false;
 static int force = false, inquire = false, doafm = false, trackps = false, show=false;
 
-#if DEBUG
+#if _DEBUG
 void debugFtell(FILE* f) {
 	char buffer[512];
 	memset(&buffer, 0, 512);
 	snprintf(&buffer, 512, "file position: %ld\n", ftell(f));
 	if (ftell(f) == 0) {
-		OutputDebugStringA("Check me");
+		OutputDebugStringA("Check me\n");
 	}
 	OutputDebugStringA(&buffer);
 
@@ -60,6 +72,7 @@ void debugFtell(FILE* f) {
 	OutputDebugStringA(&buffer);
 	snprintf(&buffer, 512, "feof: %d\n", feof(f));
 	OutputDebugStringA(&buffer);
+	//fopen(const char * _FileName, const char *_Mode)
 }
 #endif
 
@@ -497,6 +510,7 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 	    for ( j=0; j<cnt; ++j ) {
 		cur->stylewidths[j].style = getushort(f);
 		cur->stylewidths[j].widthtab = (short *)malloc((cur->last-cur->first+3)*sizeof(short));
+		// the line above seems wrong -- we have a single pointer to a short in widthtab, but we're allocating last-first+3 of them
 		for ( k=cur->first; k<=cur->last+2; ++k )
 		    cur->stylewidths[j].widthtab[k] = getushort(f);
 	    }
@@ -546,18 +560,24 @@ static FOND *BuildFondList(FILE *f,long rlistpos,int subcnt,long rdata_pos,
 		if ( k!=-1 || stringoffsets[j]==0 )
 	    continue;		/* this style doesn't exist */
 		format = stringoffsets[j]-1;
-		strlen = strings[0][0];
+		strlen = strings[0][0]; // PU: heads up-- uses strlen from file??
 		if ( format!=0 && format!=-1 )
 		    for ( k=0; k<strings[format][0]; ++k )
 			strlen += strings[ strings[format][k+1]-1 ][0];
-		pt = cur->psnames[j] = (char *)malloc(strlen+1);
+		pt = cur->psnames[j] = (char *)malloc(strlen+1); //exception on helv when j=16
 		assert(pt != NULL);
 		strcpy_s(pt, strlen+1, strings[ 0 ]+1);
-		pt += strings[ 0 ][0];
+		pt += strings[ 0 ][0]; // this is the problem? We can't add the string length to the pointer then use it -- beyond the allocation
+
+		/* Get specific style/format name and add to proposed file name */
 		if ( format!=0 && format!=-1 )
 		    for ( k=0; k<strings[format][0]; ++k ) {
-			strcpy_s(pt, strlen+1, strings[ strings[format][k+1]-1 ]+1);
-			pt += strings[ strings[format][k+1]-1 ][0];
+#if WIN32 && _DEBUG
+				OutputDebugStringA(strings[strings[format][k + 1] - 1] + 1);
+#endif
+				// PU: pt doesn't ever appeared to be used??
+			//strcpy_s(pt, strlen+1, strings[ strings[format][k+1]-1 ]+1);
+			//pt += strings[ strings[format][k+1]-1 ][0];
 		    }
 		*pt = '\0';
 	    }
@@ -711,7 +731,7 @@ return;
 
 static int ttfnamefixup(FILE *ttf,char *buffer, size_t buffer_size) {
     int version, isotf=false;
-    int i,num, nameoffset, stringoffset;
+    int i,num, nameoffset = 0, stringoffset;
     int fullval, famval, fullstr, famstr, fulllen, famlen, val, tag;
     int plat, spec, lang, name, len, off, ch;
     char *pt;
@@ -807,6 +827,7 @@ return( true );
 
 static void ttfnameset(FILE *ttf,char *curname,char *patheticattempt) {
     char buffer[1024];
+	memset(buffer, 0, 1024);
 
     if ( !ttfnamefixup(ttf,buffer, 1024))
 	strcpy_s(buffer, 1024, patheticattempt);
@@ -1320,8 +1341,8 @@ return( IsResourceInFile(buffer,NULL));
 
 __declspec(dllexport) int fondu_simple_main(char* filename)
 {
-	force = true;
-	return FindResourceFile(filename);
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_CHECK_ALWAYS_DF | _CRTDBG_LEAK_CHECK_DF);
+	force = true;	return FindResourceFile(filename);
 }
 
 int old_main(int argc, char **argv) {
