@@ -1,7 +1,7 @@
 fondu-win-dll
 =============
 
-**Highly** experimental version of `fondu` which does not have dependencies on the POSIX API and so does not need Cygwin. Designed to provide a DLL export for a future version of DfontSplitter for Windows to call into directly.
+A version of `fondu` which does not have dependencies on the POSIX API and so does not need Cygwin. Designed to provide a DLL export for DfontSplitter for Windows to call into directly.
 
 ## Original Licence
 
